@@ -46,6 +46,13 @@ class Folder
     @path = path
   end
 
+  def backup(entry)
+    unless File.exists?(tmp_path(entry))
+      puts %(backup\t#{path(entry)})
+      FileUtils.mv(path(entry), tmp_path(''))
+    end
+  end
+
   def entries
     # @entries ||= (Dir.entries(path) - IGNORE).sort_by { |f| File.mtime(path(f)) }
     @entries ||= (Dir.entries(path) - IGNORE).sort_by { |f| f.downcase }
@@ -78,6 +85,36 @@ class Folder
     end
   end
 
+  def path(name = nil)
+    n = @path
+    n += "/#{name}" if name
+    n
+  end
+
+  def restore(entry, destination)
+    _path = tmp_path(entry)
+    if File.exists?(_path) || Dir[_path].any?
+      entries = Dir[_path].any? ? Dir[_path] : [_path]
+      entries.each do |f|
+        name = File.basename(f)
+        destination_f = "#{destination}/#{name}"
+        if File.exists?(destination_f)
+          FileUtils.rm_r(destination_f)
+        end
+        puts "restore\t#{f}"
+        FileUtils.mv(f, "#{destination}")
+      end
+      FileUtils.rm_r(_path) if File.exists?(_path)
+      true
+    end
+  end
+
+  def rm_tmp
+    if File.exists?(tmp_path)
+      FileUtils.rm_r(tmp_path)
+    end
+  end
+
   # Returns size in GB
   def size
     bytes = %x(du -sk #{path})[/^\d+/]
@@ -93,32 +130,54 @@ class Folder
   # anything changes within a folder because the stick sorts items
   # by creation date!
   def sync(target)
+    puts "sync\t#{target}"
     target_folder = Folder.new(target)
 
+    # Work of folder if checksum is different
     if checksum != target_folder.checksum
-      # Delete all entries first.
+      # Backup all entries first.
       target_folder.entries.each do |f|
-        target_folder.delete(f)
+        next if f['.tmp']
+        target_folder.backup(f)
       end
       entries.each do |f|
         source = path(f)
         destination = target_folder.path(f)
         if File.directory?(source)
-          puts "mkdir\t#{destination}"
-          FileUtils.mkdir(destination)
+          unless File.exists?(destination)
+            puts "mkdir\t#{destination}"
+            FileUtils.mkdir(destination)
+          end
+          # Restore contents after directory has been created.
+          target_folder.restore("#{f}/*", destination)
         else
-          puts "copy\t#{destination}"
-          FileUtils.cp(source, destination)
+          unless target_folder.restore(f, destination)
+            # exit
+            puts "copy\t#{destination}"
+            FileUtils.cp(source, destination)
+          end
         end
       end
     end
+
+    # Work on subfolders.
     folders.each do |f|
       Folder.new(path(f)).sync(target_folder.path(f))
     end
+
+    # Remove tmp folder at last.
+    target_folder.rm_tmp
   end
 
-  def path(name = '')
-    "#{@path}/#{name}"
+  def tmp_path(name = nil)
+    @tmp_path ||= begin
+      _path = path('.tmp')
+      File.exists?(_path) || FileUtils.mkdir(_path)
+      _path
+    end
+    name ? "#{@tmp_path}/#{name}" : @tmp_path
+  end
+
   private
 
   def gb(bytes)
