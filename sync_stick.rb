@@ -29,7 +29,7 @@ unless source && File.exists?(source)
 end
 
 unless destination
-  destination = '/Volumes/STICK/'
+  destination = '/Volumes/STICK'
   unless File.exists?(destination)
     puts "#{destination} is not mounted"
   end
@@ -78,8 +78,15 @@ class Folder
     end
   end
 
+  # Returns size in GB
   def size
-    %x(du -s #{path})[/^\d+/].to_i
+    bytes = %x(du -sk #{path})[/^\d+/]
+    gb(bytes)
+  end
+
+  def space
+    bytes = %x(df -k #{path})[/^\/[^\s]+\s+(\d+)/, 1]
+    gb(bytes)
   end
 
   # All files have to be deleted and re-created on stick once
@@ -112,10 +119,18 @@ class Folder
 
   def path(name = '')
     "#{@path}/#{name}"
+  private
+
+  def gb(bytes)
+    (bytes.to_f/1024/1024).round(2)
   end
 end
 
 folder = Folder.new(source)
-if folder.size < Folder.new(destination).size
+source_size = folder.size
+destination_space = Folder.new(destination).space
+if source_size > destination_space
+  puts "Source size (#{source_size} GB) exceeds destination space (#{destination_space} GB)"
+else
   folder.sync(destination)
 end
