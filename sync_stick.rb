@@ -78,7 +78,9 @@ class Folder
 		end
 	end
 
-	# All files have to be deleted and re-created on stick once anything changes!
+	# All files have to be deleted and re-created on stick once
+  # anything changes within a folder because the stick sorts items
+  # by creation date!
 	def sync(target)
 		target_folder = Folder.new(target)
 		if checksum != target_folder.checksum
