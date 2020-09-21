@@ -78,6 +78,10 @@ class Folder
 		end
 	end
 
+  def size
+    %x(du -s #{path})[/^\d+/].to_i
+  end
+
 	# All files have to be deleted and re-created on stick once
   # anything changes within a folder because the stick sorts items
   # by creation date!
@@ -110,4 +114,7 @@ class Folder
 	end
 end
 
-Folder.new(source).sync(destination)
+folder = Folder.new(source)
+if folder.size < Folder.new(destination).size
+  folder.sync(destination)
+end
