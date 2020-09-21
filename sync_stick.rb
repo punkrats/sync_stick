@@ -7,6 +7,9 @@
 # Usage:
 # ./sync_stick.rb <source folder> [<destination folder>]
 
+# Example
+# ./sync_stick.rb ~/Stick/ /Volumes/STICK
+
 # TODO: try to get destination folder on card.
 
 require 'digest'
@@ -17,6 +20,7 @@ destination = ARGV[1]
 
 def usage
 	puts './sync_stick.rb <source folder> [<destination folder>]'
+	puts './sync_stick.rb ~/Stick/ /Volumes/STICK'
 end
 
 unless source && File.exists?(source)
