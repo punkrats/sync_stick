@@ -57,7 +57,7 @@ class Folder
 
   def checksum
     @checksum ||= begin
-      sums = files.map { |f| `#{MD5} "#{path(f)}"`[/^\w+/] }
+      sums = files.map { |f| File.size(path(f)) }
       sums += files
       sums += folders
       Digest::MD5.hexdigest(sums.join.unicode_normalize)
