@@ -113,6 +113,10 @@ class Folder
     end
   end
 
+  def same_size?(source, destination)
+    File.size(source) == File.size(destination)
+  end
+
   # Returns size of path in GB.
   def size
     bytes = %x(du -sk #{path})[/^\d+/]
@@ -153,7 +157,15 @@ class Folder
           # Restore contents after directory has been created.
           target_folder.restore("#{f}/*", destination)
         else
-          unless target_folder.restore(f, destination)
+          restored = target_folder.restore(f, destination)
+
+          # Delete file if size does not match source.
+          if restored && !target_folder.same_size?(source, destination)
+            puts "delete\t#{destination}"
+            target_folder.delete(destination)
+          end
+
+          unless File.exists?(destination)
             puts "copy\t#{destination}"
             FileUtils.cp(source, destination)
           end
