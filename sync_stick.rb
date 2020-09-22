@@ -1,16 +1,17 @@
 #!/usr/bin/env ruby
 
-# Copy files to stick in order.
-# The sticks will play files on order that they have been copied. So when
-# a folder changes, all files have to be copied again.
+# Copies files of a local folder to a MP3 stick in order.
+#
+# The stick will play files in order that they have been copied. So when
+# anything within a folder changes, all contents of that folder have to be
+# copied again. This script will backup and restore files to avoid the slow
+# copying.
 
 # Usage:
 # ./sync_stick.rb <source folder> [<destination folder>]
 
 # Example
 # ./sync_stick.rb ~/Stick/ /Volumes/STICK
-
-# TODO: try to get destination folder on card.
 
 require 'digest'
 require 'fileutils'
@@ -46,33 +47,11 @@ class Folder
     @path = path
   end
 
+  # Copy entry to .tmp folder.
   def backup(entry)
     unless File.exists?(tmp_path(entry))
       puts %(backup\t#{path(entry)})
       FileUtils.mv(path(entry), tmp_path(''))
-    end
-  end
-
-  def entries
-    # @entries ||= (Dir.entries(path) - IGNORE).sort_by { |f| File.mtime(path(f)) }
-    @entries ||= (Dir.entries(path) - IGNORE).sort_by { |f| f.downcase }
-  end
-
-  def folders
-    @folders ||= entries.select { |f| File.directory?(path(f)) }
-  end
-
-  def files
-    @files ||= entries - folders
-  end
-
-  def delete(entry)
-    begin
-      print "rm\t#{path(entry)} "
-      FileUtils.rm_rf(path(entry))
-      puts 'OK'
-    rescue Errno::ENOENT
-      puts 'FAIL'
     end
   end
 
@@ -83,6 +62,31 @@ class Folder
       sums += folders
       Digest::MD5.hexdigest(sums.join)
     end
+  end
+
+  def delete(path)
+    begin
+      FileUtils.rm_r(path)
+    rescue Errno::ENOENT
+    end
+  end
+
+  def delete_tmp
+    if File.exists?(tmp_path)
+      delete(tmp_path)
+    end
+  end
+
+  def entries
+    @entries ||= (Dir.entries(path) - IGNORE).sort_by { |f| f.downcase }
+  end
+
+  def folders
+    @folders ||= entries.select { |f| File.directory?(path(f)) }
+  end
+
+  def files
+    @files ||= entries - folders
   end
 
   def path(name = nil)
@@ -109,32 +113,29 @@ class Folder
     end
   end
 
-  def rm_tmp
-    if File.exists?(tmp_path)
-      FileUtils.rm_r(tmp_path)
-    end
-  end
-
-  # Returns size in GB
+  # Returns size of path in GB.
   def size
     bytes = %x(du -sk #{path})[/^\d+/]
     gb(bytes)
   end
 
+  # Returns disk space of path in GB.
   def space
     bytes = %x(df -k #{path})[/^\/[^\s]+\s+(\d+)/, 1]
     gb(bytes)
   end
 
+  # Syncs target recursively.
   # All files have to be deleted and re-created on stick once
   # anything changes within a folder because the stick sorts items
-  # by creation date!
+  # by creation date.
   def sync(target)
     puts "sync\t#{target}"
     target_folder = Folder.new(target)
 
-    # Work of folder if checksum is different
+    # Work of folder if checksum is different.
     if checksum != target_folder.checksum
+
       # Backup all entries first.
       target_folder.entries.each do |f|
         next if f['.tmp']
@@ -148,11 +149,11 @@ class Folder
             puts "mkdir\t#{destination}"
             FileUtils.mkdir(destination)
           end
+
           # Restore contents after directory has been created.
           target_folder.restore("#{f}/*", destination)
         else
           unless target_folder.restore(f, destination)
-            # exit
             puts "copy\t#{destination}"
             FileUtils.cp(source, destination)
           end
@@ -165,8 +166,8 @@ class Folder
       Folder.new(path(f)).sync(target_folder.path(f))
     end
 
-    # Remove tmp folder at last.
-    target_folder.rm_tmp
+    # Delete tmp folder at last.
+    target_folder.delete_tmp
   end
 
   def tmp_path(name = nil)
