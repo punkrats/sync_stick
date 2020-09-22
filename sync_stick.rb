@@ -60,7 +60,7 @@ class Folder
       sums = files.map { |f| `#{MD5} "#{path(f)}"`[/^\w+/] }
       sums += files
       sums += folders
-      Digest::MD5.hexdigest(sums.join)
+      Digest::MD5.hexdigest(sums.join.unicode_normalize)
     end
   end
 
