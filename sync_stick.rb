@@ -50,7 +50,7 @@ class Folder
   # Copy entry to .tmp folder.
   def backup(entry)
     unless File.exists?(tmp_path(entry))
-      puts %(backup\t#{path(entry)})
+      # puts %(backup\t#{path(entry)})
       FileUtils.mv(path(entry), tmp_path(''))
     end
   end
@@ -105,7 +105,7 @@ class Folder
         if File.exists?(destination_f)
           FileUtils.rm_r(destination_f)
         end
-        puts "restore\t#{f}"
+        # puts "restore\t#{f}"
         FileUtils.mv(f, "#{destination}")
       end
       FileUtils.rm_r(_path) if File.exists?(_path)
