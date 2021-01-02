@@ -37,14 +37,16 @@ unless destination
 end
 
 class Folder
-  IGNORE = [
-    '..', '.', '.DS_Store', '.Spotlight-V100', '.Trashes',
-    '.fseventsd', 'MUSICBMK.BMK'
-  ]
+  SYSTEM_FILES = ['.DS_Store', '.Spotlight-V100', '.Trashes', '.fseventsd']
+  IGNORE = ['..', '.', 'MUSICBMK.BMK'] + SYSTEM_FILES
   MD5 = 'md5sum'
 
   def initialize(path)
     @path = path
+    unless File.exists?(path)
+      puts "Folder does not exist: #{path}"
+      exit(1)
+    end
   end
 
   # Copy entry to .tmp folder.
@@ -93,6 +95,19 @@ class Folder
     n = @path
     n += "/#{name}" if name
     n
+  end
+
+  def delete_system_files
+    SYSTEM_FILES.each do |file|
+      file_path = path(file)
+      if File.exists?(file_path)
+        begin
+          delete(file_path)
+        rescue => e
+          %x(sudo rm -rf #{file_path})
+        end
+      end
+    end
   end
 
   def restore(entry, destination)
@@ -198,11 +213,15 @@ class Folder
   end
 end
 
-folder = Folder.new(source)
-source_size = folder.size
-destination_space = Folder.new(destination).space
+source_folder = Folder.new(source)
+destination_folder = Folder.new(destination)
+destination_folder.delete_system_files
+
+source_size = source_folder.size
+destination_space = destination_folder.space
+
 if source_size > destination_space
   puts "Source size (#{source_size} GB) exceeds destination space (#{destination_space} GB)"
 else
-  folder.sync(destination)
+  source_folder.sync(destination)
 end
