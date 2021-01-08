@@ -37,8 +37,8 @@ unless destination
 end
 
 class Folder
-  SYSTEM_FILES = ['.DS_Store', '.Spotlight-V100', '.Trashes', '.fseventsd']
-  IGNORE = ['..', '.', 'MUSICBMK.BMK'] + SYSTEM_FILES
+  SYSTEM_FILES = ['.DS_Store', '.Trashes', '.fseventsd']
+  IGNORE = ['..', '.', 'MUSICBMK.BMK', '.Spotlight-V100'] + SYSTEM_FILES
   MD5 = 'md5sum'
 
   def initialize(path)
@@ -102,7 +102,9 @@ class Folder
       file_path = path(file)
       if File.exists?(file_path)
         begin
-          delete(file_path)
+          if size(file_path) > 0
+            delete(file_path)
+          end
         rescue => e
           %x(sudo rm -rf #{file_path})
         end
@@ -133,7 +135,7 @@ class Folder
   end
 
   # Returns size of path in GB.
-  def size
+  def size(_path = path)
     bytes = %x(du -sk #{path})[/^\d+/]
     gb(bytes)
   end
@@ -149,7 +151,7 @@ class Folder
   # anything changes within a folder because the stick sorts items
   # by creation date.
   def sync(target)
-    puts "sync\t#{target}"
+    # puts "sync\t#{target}"
     target_folder = Folder.new(target)
 
     # Work of folder if checksum is different.
