@@ -151,48 +151,57 @@ class Folder
   # anything changes within a folder because the stick sorts items
   # by creation date.
   def sync(target)
+    failed = false
     # puts "sync\t#{target}"
     target_folder = Folder.new(target)
 
     # Work of folder if checksum is different.
     if checksum != target_folder.checksum
+      begin
 
-      # Backup all entries first.
-      target_folder.entries.each do |f|
-        next if f['.tmp']
-        target_folder.backup(f)
-      end
-      entries.each do |f|
-        source = path(f)
-        destination = target_folder.path(f)
-        if File.directory?(source)
-          unless File.exists?(destination)
-            puts "mkdir\t#{destination}"
-            FileUtils.mkdir(destination)
-          end
+        # Backup all entries first.
+        target_folder.entries.each do |f|
+          next if f['.tmp']
+          target_folder.backup(f)
+        end
+        entries.each do |f|
+          source = path(f)
+          destination = target_folder.path(f)
+          if File.directory?(source)
+            unless File.exists?(destination)
+              puts "mkdir\t#{destination}"
+              FileUtils.mkdir(destination)
+            end
 
-          # Restore contents after directory has been created.
-          target_folder.restore("#{f}/*", destination)
-        else
-          restored = target_folder.restore(f, destination)
+            # Restore contents after directory has been created.
+            target_folder.restore("#{f}/*", destination)
+          else
+            restored = target_folder.restore(f, destination)
 
-          # Delete file if size does not match source.
-          if restored && !target_folder.same_size?(source, destination)
-            puts "delete\t#{destination}"
-            target_folder.delete(destination)
-          end
+            # Delete file if size does not match source.
+            if restored && !target_folder.same_size?(source, destination)
+              puts "delete\t#{destination}"
+              target_folder.delete(destination)
+            end
 
-          unless File.exists?(destination)
-            puts "copy\t#{destination}"
-            FileUtils.cp(source, destination)
+            unless File.exists?(destination)
+              puts "copy\t#{destination}"
+              FileUtils.cp(source, destination)
+            end
           end
         end
+
+      rescue Errno::ENOSPC
+        puts 'No space left on device!'
+        failed = true
       end
     end
 
     # Work on subfolders.
-    folders.each do |f|
-      Folder.new(path(f)).sync(target_folder.path(f))
+    unless failed
+      folders.each do |f|
+        Folder.new(path(f)).sync(target_folder.path(f))
+      end
     end
 
     # Delete tmp folder at last.
